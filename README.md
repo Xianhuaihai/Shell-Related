@@ -26,3 +26,4 @@ no_dep_start: 不考虑依赖环境启动
 jar_check: 检查所有java程序启动状态
 
  dep_check：检查依赖环境启动状态
+ find: 扫描java程序
