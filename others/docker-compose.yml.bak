@@ -1,0 +1,48 @@
+version: "2"
+services:
+  parkedge-db:
+    image: 192.168.100.34/xianhuaihai/parkedge-db:v1
+    volumes:
+      - parkedge-db:/var/lib/mysql
+    networks:
+      - parkedge-net
+    environment:
+      MYSQL_ROOT_PASSWORD: qGNBNC8c
+      TZ: Asia/Shanghai
+    command:
+      --lower_case_table_names=1
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_general_ci
+    ports:
+      - 3306:3306
+    container_name: parkedge-db
+  parkedge-redis:
+    image: 192.168.100.34/xianhuaihai/redis:v1
+    ports:
+      - 6379:6379
+    container_name: parkedge-redis
+    networks:
+      - parkedge-net
+  parkedge-app:
+    image: 192.168.100.34/xianhuaihai/parkedge-app:v1
+    networks:
+      - parkedge-net
+    container_name: parkedge-app
+    depends_on:
+      - parkedge-db
+      - parkedge-redis
+    ports:
+      - 8080:8080
+  parkedge-nginx:
+    image: 192.168.100.34/xianhuaihai/parkedge-nginx:v1
+    networks:
+      - parkedge-net
+    container_name: parkedge-nginx
+    ports:
+      - 80:80
+    depends_on:
+      - parkedge-app
+volumes:
+  parkedge-db:
+networks:
+  parkedge-net:
