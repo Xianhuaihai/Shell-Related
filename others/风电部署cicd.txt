@@ -1,0 +1,137 @@
+pipeline {
+	agent none
+	parameters {
+		extendedChoice defaultValue: 'deploy',
+		description: '部署还是回滚', 
+		descriptionPropertyValue: 'deploy(部署),rollback(始终回退到最近的上个版本)', 
+		multiSelectDelimiter: ',',
+		name: 'mytype',
+        quoteValue: false, 
+		saveJSONParameterToFile: false, 
+        type: 'PT_RADIO',
+		value: 'deploy,rollback', 
+		visibleItemCount: 2
+		
+		extendedChoice description: '选择git仓库', 
+		multiSelectDelimiter: ',', 
+		name: 'mygit', 
+		quoteValue: false, 
+		saveJSONParameterToFile: false, 
+		type: 'PT_RADIO', 
+		value: 'http://192.168.100.81:81/wind-power-front/wind_power_system.app.git,http://192.168.100.81:81/wind-power-front/wind_iot_system.frontend.git,http://192.168.100.81:81/wind-power-front/wind_power_system.frontend.git', 
+		visibleItemCount: 5
+	}
+	environment { 
+        MYIMAGES = 'node:12.22.6-alpine3.13'
+    }
+    stages {
+         stage('打印环境变量') {
+			agent any
+            steps {
+                echo "${BUILD_NUMBER}"
+                echo "${JOB_NAME}"
+                echo "${WORKSPACE}"
+                echo "${BUILD_ID}"
+                echo "${params.mygit}"
+				echo "${params.mytype}"
+                
+
+            }
+        }
+        stage('Test') {
+			agent {
+				docker { 
+					image "${MYIMAGES}"
+					label '192.168.100.178'
+					args '-v /root/.npm:/root/.npm'
+				}
+			}
+			when {
+				expression { params.mytype == 'deploy'}
+			}
+            steps {
+                sh 'node --version'
+                sh 'hostname'
+            }
+        }
+        stage('pull git'){
+		    agent {
+				docker { 
+					image "${MYIMAGES}"
+					label '192.168.100.178'
+					args '-v /root/.npm:/root/.npm'
+				}
+			}
+			when {
+				expression { params.mytype == 'deploy'}
+			}
+            steps {
+                checkout([$class: 'GitSCM', 
+                branches: [[name: '*/dev']], 
+                extensions: [], 
+                userRemoteConfigs: [[credentialsId: 'gitlab', 
+                url: "${params.mygit}"]]
+                ])
+            }
+        }
+        stage('build vue'){
+		    agent {
+				docker { 
+					image "${MYIMAGES}"
+					label '192.168.100.178'
+					args '-v /root/.npm:/root/.npm'
+				}
+			}
+			when {
+				expression { params.mytype == 'deploy'}
+			}
+            steps {
+			   sh 'npm config set registry https://registry.npm.taobao.org'
+			   sh 'npm config get registry'
+			   sh 'npm install webpack -g'
+			   sh 'npm install --save-dev mini-css-extract-plugin'
+               sh 'npm install'
+               sh 'npm run build'
+                
+            }
+        }
+		stage ('部署'){
+			agent {
+				label '192.168.100.178'
+			}
+			when {
+				expression { 
+				params.mytype == 'deploy'
+				}
+			}
+			steps{
+				sh 'hostname'
+				echo "${WORKSPACE}"
+				sh "bash /root/deploy.sh ${params.mygit} ${params.mytype}"
+			}
+			post {	
+				always {
+				//清理工作目录
+				deleteDir()
+				}
+			}
+		}
+
+		stage ('回滚'){
+			agent {
+				label '192.168.100.178'
+			}
+			when {
+				expression { params.mytype == 'rollback'}
+			}
+			steps {
+				sh 'hostname'
+				echo "${WORKSPACE}"
+				echo "回滚"
+				sh "bash /root/deploy.sh ${params.mygit} ${params.mytype}"
+				
+			}
+		}
+    }
+
+}
