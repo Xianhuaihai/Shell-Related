@@ -1,0 +1,69 @@
+pipeline {
+    agent {
+        label '123.60.96.215'
+    }
+    environment {
+        DOCKER_NAME = "parkcloud-parking-prod"
+        DOCKER_TAG = "p"
+    }
+
+    stages {
+        stage('print environment') {
+            steps {
+                echo "Hello World!!"
+                echo "${BUILD_NUMBER}"
+                echo "${JOB_NAME}"
+                echo "${WORKSPACE}"
+                echo "${BUILD_ID}"
+                echo "${JOB_BASE_NAME}"
+
+            }
+        }
+        stage('pull git'){
+            steps {
+                checkout([$class: 'GitSCM',
+                branches: [[name: '*/dev']],
+                extensions: [],
+                userRemoteConfigs: [[credentialsId: 'gitlab-121.36.220.251',
+                url: 'http://121.36.220.251:8100/smart-parking/backend/parkcloud/parkcloud-parking.git']]
+                ])
+            }
+        }
+        stage('maven build'){
+            steps{
+                //配置maven阿里云jing'xiang
+                withMaven(maven: 'maven3.8.2', mavenSettingsConfig: '471ee712-f57f-447d-9dea-c97884185c53') {
+                    // build
+                    sh 'mvn -U clean package -Dmaven.test.skip=true -Pprod'
+                }
+            }
+        }
+        stage('build images'){
+            steps{
+                sh '''docker build -t ${DOCKER_NAME}-${JOB_NAME}:${DOCKER_TAG}${BUILD_NUMBER} .
+                '''
+            }
+        }
+        stage('start docker'){
+            steps{
+                echo 'start image'
+                //删除容器
+                sh "docker rm -f ${DOCKER_NAME}||true"
+                //启动容器
+                sh '''
+                docker run -d --network zhibo --name ${DOCKER_NAME} -p 7005:7005 ${DOCKER_NAME}-${JOB_NAME}:${DOCKER_TAG}${BUILD_NUMBER}
+                '''
+                //只保留最近5个镜像
+                sh '''
+                docker images | grep ${JOB_NAME}|awk 'NR>5{print $3}'| xargs docker rmi &>/dev/null || true
+                '''
+            }
+        }
+    }
+    post {
+        always {
+            //清理工作目录
+            deleteDir()
+        }
+    }
+}
