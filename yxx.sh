@@ -10,7 +10,7 @@
 
 set -e
 #项目jar包目录 若有多个目录需要用空格隔开，目录后不能指定/ 如/data/不能有后面的/, 正确写法/data
-APP_PATH="/data/crayfish /data/crayfish_government"
+APP_PATH="/data/tianzow/backend"
 #运行环境依赖
 depenv="consul mysqld redis rabbit"
 #java参数
@@ -132,6 +132,17 @@ function mydep_check(){
 		fi
 	done
 }
+usage () {
+    echo "usage: yxx PLATFORM"
+
+    echo "用法: "
+    echo "  ./yxx start            只有当依赖环境都启动完成才能启动jar程序"
+    echo "  ./yxx no_dep_start     直接启动jar程序，不考虑依赖环境影响"
+    echo "  ./yxx stop             停止所有jar服务"
+    echo "  ./yxx jar_check        检查jar启动状态"
+    echo "  ./yxx dep_check        检查依赖环境启动状态"
+
+}
 case "$1" in 
 	"start")
 		#只有当依赖环境都启动完成才能运行jar程序
@@ -173,6 +184,6 @@ case "$1" in
 		done
 		;;
 	*)
-		echo "参数错误，请输入参数 start stop jar_check dep_check"
+		usage;exit 0
 		;;
 esac
